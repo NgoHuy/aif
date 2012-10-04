@@ -3,7 +3,6 @@
 
 # Global Variables
 # Be sure to override these if you have the configuration file elsewhere
-syslinuxmenu="/boot/syslinux/syslinux.cfg"
 
 # check if a worker has completed successfully. if not -> tell user he must do it + return 1
 # if ok -> don't warn anything and return 0
@@ -745,6 +744,7 @@ If any previous configuration you've done until now (like fancy filesystems) req
 	done
 
 	ask_option no "Choose bootloader" "Which bootloader would you like to use?" optional \
+	"grub-bios" "Grub bootloader not support RAID" \
 	"syslinux" "Syslinux bootloader (${syslinux_supported_fs[*]})"
 
 	bootloader=$ANSWER_OPTION
@@ -885,6 +885,8 @@ interactive_runtime_network() {
 interactive_install_bootloader () {
 	if [[ $bootloader = syslinux ]]; then
 		interactive_syslinux || return 1
+	elif [[ $bootloader = grub-bios ]]; then
+		interactive_grub || return 1
 	else
 		show_warning 'No Bootloader' 'You did not select a bootloader. No bootloader will be installed.'
 	fi
@@ -920,63 +922,31 @@ interactive_syslinux() {
 		show_warning "Invalid FS" "Error: Syslinux does not support $filesystem.\n\nThe following filesystems are supported:\n  ${syslinux_supported_fs[@]}"
 		return 1
 	fi
-
-	# remove default entries by truncating file at our little tag (#-*)
-	sed -i -e '/#-\*/q' "$syslinuxmenu"
-
-	# Generate menu and prompt user to edit it
-	interactive_bootloader_menu "syslinux" "$syslinuxmenu" || return $?
-
-	if device_is_raid "$bootpart"; then
-		debug FS "Software RAID detected"
-		local onraid=true
-	fi
-
-	debug FS "Installing Syslinux (chroot $var_TARGET_DIR syslinux-install_update -i)"
-	inform "Installing Syslinux..."
-	if ! "chroot $var_TARGET_DIR syslinux-install_update" -i >$LOG 2>&1; then
-		debug FS "FAILED: syslinux-install_update -i failed"
-		show_warning "FAILED" "syslinux-install_update -i failed"
-		return 1
-	fi
-
-	if ask_yesno "Set boot flag(s) and install the Syslinux MBR?" yes; then
-		inform "Setting Boot Flag(s)...\nThis could take a while. Please be patient.\n\n" syslinuxprog
-		if "chroot $var_TARGET_DIR syslinux-install_update" -a >$LOG 2>&1; then
-			debug FS "Successfully set boot flag(s)"
-		else
-			debug FS "Failde to set boot flag(s). syslinux-install_update -a failed with Error Code - $?"
-			show_warning "FAILED" "Failed to set boot flag(s). MBR not installed" && return 1
-		fi
-
-		inform "Installing Syslinux MBR..." syslinuxprog
-		if "chroot $var_TARGET_DIR syslinux-install_update" -m >$LOG 2>&1; then
-			debug FS "Successfully installed MBR(s)"
-		else
-			debug FS "Failed to install MBR. syslinux-install_update -m failed with Error Code - $?"
-			show_warning "FAILED" "Failed to install the MBR!" && return 1
-		fi
-	fi
-	notify "Syslinux Installation Successful"
-}
-
-generate_syslinux_menu () {
-	get_kernel_parameters || return
-
-	cat >>$syslinuxmenu <<EOF
-
+	
+	notify "Syslinux's installing"
+	mount -t proc /proc $var_TARGET_DIR/proc
+	mount --rbind /dev/ $var_TARGET_DIR/dev/
+	chroot $var_TARGET_DIR syslinux-install_update -ia
+	dd bs=440 count=1 conv=notrunc if=/usr/lib/syslinux/mbr.bin of=/dev/sda && notify "Syslinux Installation Successful"
+	#TODO: how to change sda with your device ?	
+	
+	cat >$var_TARGET_DIR/boot/syslinux/syslinux.cfg <<EOF
+UI menu.c32
+PROMPT 0
+TIMEOUT 50
+DEFAULT Arch
 # (0) Arch Linux
-LABEL arch
+LABEL Arch
     MENU LABEL Arch Linux
     LINUX ../vmlinuz-linux
-    APPEND $kernel_parameters
+    APPEND root=$(chroot $var_TARGET_DIR mount | grep -w / | cut -f 1 -d ' ')  ro
     INITRD ../initramfs-linux.img
 
 # (1) Arch Linux Fallback
 LABEL archfallback
     MENU LABEL Arch Linux Fallback
     LINUX ../vmlinuz-linux
-    APPEND $kernel_parameters
+    APPEND root=$(chroot $var_TARGET_DIR mount | grep -w / | cut -f 1 -d ' ') ro
     INITRD ../initramfs-linux-fallback.img
 
 # (2) Windows
@@ -998,75 +968,6 @@ LABEL off
 EOF
 }
 
-# $1 - Bootloader Name
-# $2 - Bootloader Configuration Files
-interactive_bootloader_menu() {
-	if [[ $1 = syslinux ]]; then
-		generate_syslinux_menu || return
-	fi
-
-	ls -1 /sys/block | grep -q ^dm- && local helptext="  /dev/mapper/ users: Pay attention to the kernel line!"
-	notify "Before installing $1, you must review the configuration file.  You will now be put into the editor.  After you save your changes and exit the editor, you can install $1.$helptext"
-
-	seteditor || return 1
-
-	$EDITOR $2
-}
-
-get_kernel_parameters() {
-	get_device_with_mount '/' || return 1
-	local rootpart="$ANSWER_DEVICE"
-
-	case "$PART_ACCESS" in
-		label)
-			local label
-			label="$(getlabel $rootpart)" && \
-			rootpart="/dev/disk/by-label/$label" ;;
-		uuid)
-			local uuid
-			uuid="$(getuuid $rootpart)" && \
-			rootpart="/dev/disk/by-uuid/$uuid" ;;
-	esac
-
-	kernel_parameters="root=$rootpart ro"
-
-	local raw_device crypt_device lv_device 
-
-	if get_anchestors_mount ';/;'; then
-		if echo "$ANSWER_DEVICES" | sed -n '1p' | grep -q 'dm_crypt$' && echo "$ANSWER_DEVICES" | sed -n '2p' | grep -q 'raw$'
-		then
-			debug 'FS' 'get_kernel_parameters - Found / on dm_crypt on raw'
-			raw_device="$(echo "$ANSWER_DEVICES" | sed -n '2p' | cut -d ' ' -f1)"
-			crypt_device="$(echo "$ANSWER_DEVICES" | sed -n '1p' | cut -d ' ' -f1)"
-			kernel_parameters="root=$crypt_device cryptdevice=$raw_device:`basename $crypt_device` ro"
-		elif echo "$ANSWER_DEVICES" | sed -n '1p' | grep -q 'lvm-lv$' && echo "$ANSWER_DEVICES" | sed -n '4p' | grep -q 'dm_crypt$' && echo "$ANSWER_DEVICES" | sed -n '5p' | grep -q 'raw$'
-		then
-			debug 'FS' 'get_kernel_parameters - Found / on lvm on dm_crypt on raw'
-			lv_device="$(echo "$ANSWER_DEVICES" | sed -n '1p' | cut -d ' ' -f1)"
-			crypt_device="$(echo "$ANSWER_DEVICES" | sed -n '4p' | cut -d ' ' -f1)"
-			raw_device="$(echo "$ANSWER_DEVICES" | sed -n '5p' | cut -d ' ' -f1)"
-			kernel_parameters="root=$lv_device cryptdevice=$raw_device:`basename $crypt_device` ro"
-		elif echo "$ANSWER_DEVICES" | sed -n '1p' | grep -q 'dm_crypt$' && echo "$ANSWER_DEVICES" | sed -n '2p' | grep -q 'lvm-lv$' && echo "$ANSWER_DEVICES" | sed -n '5p' | grep -q 'raw$'
-		then
-			debug 'FS' 'get_kernel_parameters - Found / on dm_crypt on lvm on raw'
-			crypt_device="$(echo "$ANSWER_DEVICES" | sed -n '1p' | cut -d ' ' -f1)"
-			lv_device="$(echo "$ANSWER_DEVICES" | sed -n '2p' | cut -d ' ' -f1)"
-			kernel_parameters="root=$crypt_device cryptdevice=$lv_device:`basename $crypt_device` ro"
-		elif echo "$ANSWER_DEVICES" | sed -n '1p' | grep -q 'raw$'
-		then
-			debug 'FS' 'get_kernel_parameters - Found / on raw'
-		elif echo "$ANSWER_DEVICES" | sed -n '1p' | grep -q 'lvm-lv$' && echo "$ANSWER_DEVICES" | sed -n '4p' | grep -q 'raw$'
-		then
-			debug 'FS' 'get_kernel_parameters - Found / on lvm on raw'
-		else
-			debug 'FS' 'get_kernel_parameters - Could not figure this one out'
-			show_warning "Disk setup detection" "Are you using some really fancy dm_crypt/lvm/softraid setup?\nI could not figure it out, so the kernel line will be the default: you'll probably need to edit it.\nPlease file a bug for this and supply all files from /tmp/aif/"
-		fi
-	else
-		show_warning "Disk setup detection" "Could not find out where your / is.  Did you setup filesystems/blockdevices? manual/autoprepare?  If yes, please file a bug and tell us about this"
-		return 1
-	fi
-}
 
 
 # displays installation source selection menu
@@ -1154,4 +1055,115 @@ interactive_select_mirror() {
 		# MIRROR now something like ftp://archlinux.puzzle.ch/$repo/os/$arch
 	fi
 	echo "Using mirror: $MIRROR" >$LOG
+}
+
+interactive_grub() {
+	[ ! -f $grubmenu ] && show_warning "No grub?" "Error: Couldn't find $grubmenu.  Is GRUB installed?" && return 1
+
+	debug FS "starting interactive_grub"
+	# try to auto-configure GRUB...
+	debug 'UI-INTERACTIVE' "install_grub \$PART_ROOT $PART_ROOT \$GRUB_OK $GRUB_OK"
+	if get_device_with_mount '/' && [ "$GRUB_OK" != '1' ] ; then
+		GRUB_OK=0
+		PART_ROOT=$ANSWER_DEVICE
+		# look for a separately-mounted /boot partition
+		# This could be used better, maybe we use a better variable name cause
+		# we use this later in many things in workflow.
+		# Currently we have bootdev as a device if we have a seperate /boot or empty
+		# if no seperate /boot. Where our /boot realy lives is important later
+		# to build the grub: root (hdx,y) part.
+		# So maybe we set a flag variable like: sepboot=true|false and set bootdev to either
+		# the partition with seperate /boot or to $PART_ROOT.
+		# So that bootdev is always our real partition with /boot....
+		bootdev=$(mount | grep $var_TARGET_DIR/boot | cut -d' ' -f 1)
+		# check if PART_ROOT (or bootdev, if it is a blockdevice) is on a md raid array
+		# This dialog is only shown when we detect / or /boot on a raid device.
+
+		DEVS="$(finddisks '_ ')"
+		if [ "$DEVS" = " " ]; then
+			notify "No hard drives were found"
+			return 1
+		fi
+		
+		sync
+		# freeze xfs filesystems to enable grub installation on xfs filesystems
+		for xfsdev in $(blkid -t TYPE=xfs -o device); do
+			mnt=$(mount | grep $xfsdev | cut -d' ' -f 3)
+			if [ $mnt = "$var_TARGET_DIR/boot" -o $mnt = "$var_TARGET_DIR/" ]; then
+				/usr/sbin/xfs_freeze -f $mnt > /dev/null 2>&1
+			fi
+		done
+		
+			# Set boot partition to the device where our /boot lives.
+			[ -z $bootdev ] && bootpart=$PART_ROOT || bootpart=$bootdev
+			ask_option no "Boot device selection" "Select the boot device where the GRUB bootloader will be installed (usually the MBR and not a partition)." required $DEVS || return 1
+			bootdev=$ANSWER_OPTION
+			boothd=$(echo $bootdev | cut -c -8)
+			interactive_grub_install 
+			if [ $? -eq 0 ]; then
+				GRUB_OK=1
+			fi
+
+			if [ "$bootpart" = "" ]; then
+				if [ "$PART_ROOT" = "" ]; then
+					ask_string "Enter the full path to your root device" "/dev/sda3" || return 1
+					bootpart=$ANSWER_STRING
+				else
+					bootpart=$PART_ROOT
+				fi
+				boothd=$(echo $bootpart | cut -c -8)
+				interactive_grub_install 
+				if [ $? -eq 0 ]; then
+					GRUB_OK=1
+				fi
+			fi
+
+		# unfreeze xfs filesystems
+		for xfsdev in $(blkid -t TYPE=xfs -o device); do
+			mnt=$(mount | grep $xfsdev | cut -d' ' -f 3)
+			if [ $mnt = "$var_TARGET_DIR/boot" -o $mnt = "$var_TARGET_DIR/" ]; then
+				/usr/sbin/xfs_freeze -u $mnt > /dev/null 2>&1
+			fi
+		done
+
+		if [ "$GRUB_OK" == "1" ]; then
+			notify "GRUB was successfully installed."
+		else
+			show_warning "Grub installation failure" "GRUB was NOT successfully installed."
+			return 1
+		fi
+		return 0
+	fi
+}
+
+interactive_grub_install () {
+	
+	local bootpart=$(mount | grep boot | cut -f 1 -d ' ')
+	if [ -z "$bootpart" ]; then
+		notify "Error: Missing/Invalid root device for $1"
+		return 1
+	fi
+	local bootdev=$(ls /dev/ | grep -m 1 sd)
+	if [ -z "$bootdev" ]; then
+		notify "GRUB root and setup devices could not be auto-located.  You will need to manually run the GRUB shell to install a bootloader."
+		return 1
+	fi
+	debug FS "bootpart: $bootpart"
+	debug FS "bootdev: $bootdev"
+	
+	#install grub-bios
+	notify " grub's installing on $bootdev"
+	modprobe dm-mod
+	$var_TARGET_DIR/usr/sbin/grub-install --target=i386-pc --boot-directory=$var_TARGET_DIR/boot/ --recheck /dev/$bootdev
+	mkdir -p $var_TARGET_DIR/boot/grub/locale
+	cp $var_TARGET_DIR/usr/share/locale/en\@quot/LC_MESSAGES/grub.mo $var_TARGET_DIR/boot/grub/locale/en.mo
+	mount --rbind /dev $var_TARGET_DIR/dev
+	chroot $var_TARGET_DIR grub-mkconfig -o /boot/grub/grub.cfg && notify " generate grub.cfg successfully"
+	notify " grub's installed on $bootdev"
+	
+	cat /tmp/grub.log >$LOG
+	if grep -q "Error [0-9]*: " /tmp/grub.log; then
+		notify "Error installing GRUB. (see $LOG for output)"
+		return 1
+	fi
 }
