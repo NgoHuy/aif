@@ -12,6 +12,7 @@ install:
 	install -D -m755 src/aif-report-issues.sh $(DESTDIR)/sbin/aif-report-issues.sh
 	install -D -m644 README $(DESTDIR)/usr/share/aif/docs
 	install -D -m644 doc/* $(DESTDIR)/usr/share/aif/docs
+	install -D -m755 setup.sh $(DESTDIR)/sbin/setup
 	cp -rp src/core $(DESTDIR)/usr/lib/aif
 	chmod -R 755 $(DESTDIR)/usr/lib/aif/core
 	cp -rp src/user $(DESTDIR)/usr/lib/aif
@@ -20,7 +21,7 @@ install:
 	chmod -R 755 $(DESTDIR)/usr/share/aif/examples
 	cp -rp tests $(DESTDIR)/usr/share/aif
 	chmod -R 755 $(DESTDIR)/usr/share/aif/tests
-
+	cd libui-sh ; make install
 
 uninstall:
 	rm -f  $(DESTDIR)/sbin/aif
@@ -28,3 +29,4 @@ uninstall:
 	rm -f  $(DESTDIR)/sbin/aif-report-issues.sh
 	rm -rf $(DESTDIR)/usr/share/aif
 	rm -rf $(DESTDIR)/usr/lib/aif
+	cd libui-sh ; make uninstall
