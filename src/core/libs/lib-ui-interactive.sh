@@ -91,16 +91,13 @@ interactive_configure_system()
 				chroot ${var_TARGET_DIR} passwd root && break
 			done
 		elif [ "$FILE" = "/etc/hostname" ]; then # change rc.conf to hostname
-			HOSTNAME_PRE=$(source ${var_TARGET_DIR}${FILE} && echo $HOSTNAME)
+			
 			$EDITOR ${var_TARGET_DIR}${FILE}
-			HOSTNAME_POST=$(source ${var_TARGET_DIR}${FILE} && echo $HOSTNAME)
-			if [ "$HOSTNAME_PRE" != "$HOSTNAME_POST" ]; then
-				# remove all occurences of old hostname in /etc/hosts:
-				sed -i "s# $HOSTNAME_PRE##" ${var_TARGET_DIR}/etc/hosts
+			HOSTNAME=`cat ${var_TARGET_DIR}${FILE}`				
 				# add new hostname to /etc/hosts except in the - admittedly unlikely, but anyway - event the user already added it himself
-				sed -i "/$HOSTNAME/"'!s'"/127\.0\.0\.1.*$HOSTNAME.*/& $HOSTNAME/" hosts
-				sed -i "/$HOSTNAME/"'!s'"/\:\:1.*$HOSTNAME.*/& $HOSTNAME/" hosts
-			fi
+				sed -i "6,7 s/$/ $HOSTNAME/" /etc/hosts
+				
+			
 		else
 			$EDITOR ${var_TARGET_DIR}${FILE}
 		fi
