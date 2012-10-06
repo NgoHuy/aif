@@ -122,9 +122,10 @@ cleanup_runtime ()
 dohwclock() {
 	# TODO: we probably only need to do this once and then actually use adjtime on next invocations
 	inform "Resetting hardware clock adjustment file"
-	[ -d /var/lib/hwclock ] || mkdir -p /var/lib/hwclock || return 1
-	if [ ! -f /var/lib/hwclock/adjtime ]; then
-		echo "0.0 0 0.0" > /var/lib/hwclock/adjtime || return 1
+	#[ -d /var/lib/hwclock ] || mkdir -p /var/lib/hwclock || return 1
+	if [ ! -f /etc/adjtime ]; then #change /var/lib/hwclock/adjtime to /etc/adjtime
+		#echo "0.0 0 0.0" > /var/lib/hwclock/adjtime || return 1
+		hwclock --utc
 	fi
 
 	inform "Syncing clocks ($2), hc being $1 ..."
@@ -144,14 +145,16 @@ dohwclock() {
 	return 0
 }
 
+#change /etc/rc.conf to /etc/vconsole.conf
 target_configure_initial_keymap_font ()
 {
 	local ret=0
 	if [ -n "$var_KEYMAP" ]; then
-		sed -i "s/^KEYMAP=.*/KEYMAP=\"`basename $var_KEYMAP .map.gz`\"/" ${var_TARGET_DIR}/etc/rc.conf || ret=$?
+		echo "KEYMAP=`basename $var_KEYMAP .map.gz`" > ${var_TARGET_DIR}/etc/vconsole.conf || ret=$?
 	fi
 	if [ -n "$var_CONSOLEFONT" ]; then
-		sed -i "s/^CONSOLEFONT=.*/CONSOLEFONT=\"${var_CONSOLEFONT/\.*/}\"/" ${var_TARGET_DIR}/etc/rc.conf || ret=$?
+		echo "FONT=${var_CONSOLEFONT}" >> ${var_TARGET_DIR}/etc/vconsole.conf || ret=$? # edit consolefont to font
+
 	fi
 	return $ret
 }
@@ -160,15 +163,15 @@ target_configure_time () {
 	# /etc/rc.conf
 	# Make sure timezone and utc info are what we want
 	# NOTE: If a timezone string never contains more then 1 slash, we can use ${TIMEZONE/\//\\/}
-	sed -i -e "s/^TIMEZONE=.*/TIMEZONE=\"${TIMEZONE//\//\\/}\"/g" \
-		-e "s/^HARDWARECLOCK=.*/HARDWARECLOCK=\"$HARDWARECLOCK\"/g" \
-		${var_TARGET_DIR}/etc/rc.conf
+	ln -s /usr/share/zoneinfo/$TIMEZONE ${var_TARGET_DIR}/etc/localtime
 }
 
+
+#target localtime is needded ?
 target_localtime () {
-	if [ -f /etc/localtime ]
+	if [   ! ${var_TARGET_DIR}/etc/localtime ] # if ! /etc/localtime
 	then
-		cp /etc/localtime ${var_TARGET_DIR}/etc/localtime || return 1
+		ln -s /usr/share/zoneinfo/$TIMEZONE ${var_TARGET_DIR}/etc/localtime || return 1 
 	fi
 	return 0
 }
