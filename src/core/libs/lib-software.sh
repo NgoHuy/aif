@@ -68,8 +68,8 @@ installpkg() {
 target_configure_initial_locale() 
 {
 	
-		sed -i -e "s/^#en_U/en_U/g" ${var_TARGET_DIR}/etc/locale.gen
-
+	sed -i  "s/^#en_U/en_U/g" ${var_TARGET_DIR}/etc/locale.gen
+	cat /etc/locale.conf > ${var_TARGET_DIR}/etc/locale.conf #add locale.conf
 	target_locale-gen
 }
 
@@ -77,7 +77,7 @@ target_configure_initial_locale()
 target_locale-gen ()
 {
 	inform "Generating glibc base locales..."
-	chroot ${var_TARGET_DIR} locale-gen >/dev/null
+	chroot ${var_TARGET_DIR} locale-gen 
 }
 
 target_configure_initcpio () {
