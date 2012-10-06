@@ -72,6 +72,9 @@ interactive_configure_system()
 			"/etc/modprobe.d/modprobe.conf" "Kernel Modules"
 			"/etc/resolv.conf"              "DNS Servers"
 			"/etc/hosts"                    "Network Hosts"
+			"/etc/hostname"			"Hosts Name" # add hostname
+			"/etc/vconsole.conf"		"virtual Console keymap and font" #add vconsole.conf
+			"/etc/locale.conf"		"Locale config file" # add locale config file
 			"/etc/locale.gen"               "Glibc Locales"
 			"/etc/pacman.conf"              "Pacman.conf"
 			"$var_MIRRORLIST"               "Pacman Mirror List"
@@ -87,7 +90,7 @@ interactive_configure_system()
 			while true; do
 				chroot ${var_TARGET_DIR} passwd root && break
 			done
-		elif [ "$FILE" = "/etc/rc.conf" ]; then
+		elif [ "$FILE" = "/etc/hostname" ]; then # change rc.conf to hostname
 			HOSTNAME_PRE=$(source ${var_TARGET_DIR}${FILE} && echo $HOSTNAME)
 			$EDITOR ${var_TARGET_DIR}${FILE}
 			HOSTNAME_POST=$(source ${var_TARGET_DIR}${FILE} && echo $HOSTNAME)
@@ -133,7 +136,7 @@ copy_timezone_file () {
 	# This changes probably also the systemtime (UTC->$TIMEZONE)!
 	# localtime users will have a false time after that!
 	rm -f /etc/localtime || return 1
-	cp "/usr/share/zoneinfo/$TIMEZONE" /etc/localtime || return 1
+	ln -s /usr/share/zoneinfo/$TIMEZONE /etc/localtime || return 1 # chang cp to ln
 	return 0
 }
 
@@ -924,11 +927,12 @@ interactive_syslinux() {
 	fi
 	
 	notify "Syslinux's installing"
-	mount -t proc /proc $var_TARGET_DIR/proc
-	mount --rbind /dev/ $var_TARGET_DIR/dev/
-	chroot $var_TARGET_DIR syslinux-install_update -ia
-	dd bs=440 count=1 conv=notrunc if=/usr/lib/syslinux/mbr.bin of=/dev/sda && notify "Syslinux Installation Successful"
-	#TODO: how to change sda with your device ?	
+	
+	mount -t proc proc $var_TARGET_DIR/proc
+	mount -t sysfs sysfs $var_TARGET_DIR/sys
+	mount --rbind /dev $var_TARGET_DIR/dev
+	
+	chroot $var_TARGET_DIR syslinux-install_update -iam && notify "install successfull on disk" # add -c as chroot	
 	
 	cat >$var_TARGET_DIR/boot/syslinux/syslinux.cfg <<EOF
 UI menu.c32
@@ -966,7 +970,11 @@ LABEL off
     MENU LABEL Power Off
     COMBOOT poweroff.com
 EOF
-}
+
+umount  $var_TARGET_DIR/proc
+umount  $var_TARGET_DIR/sys
+umount  $var_TARGET_DIR/dev
+} 
 
 
 
@@ -1138,12 +1146,12 @@ interactive_grub() {
 
 interactive_grub_install () {
 	
-	local bootpart=$(mount | grep boot | cut -f 1 -d ' ')
+	local bootpart=$( mount | grep boot | cut -f 1 -d ' ')
 	if [ -z "$bootpart" ]; then
-		notify "Error: Missing/Invalid root device for $1"
+		notify "Error: Missing/Invalid boot partition"
 		return 1
 	fi
-	local bootdev=$(ls /dev/ | grep -m 1 sd)
+	local bootdev=$( ls /dev/ | grep -m 1 sd)
 	if [ -z "$bootdev" ]; then
 		notify "GRUB root and setup devices could not be auto-located.  You will need to manually run the GRUB shell to install a bootloader."
 		return 1
@@ -1161,6 +1169,7 @@ interactive_grub_install () {
 	chroot $var_TARGET_DIR grub-mkconfig -o /boot/grub/grub.cfg && notify " generate grub.cfg successfully"
 	notify " grub's installed on $bootdev"
 	
+	umount $var_TARGET_DIR/dev
 	cat /tmp/grub.log >$LOG
 	if grep -q "Error [0-9]*: " /tmp/grub.log; then
 		notify "Error installing GRUB. (see $LOG for output)"
