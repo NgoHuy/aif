@@ -119,7 +119,7 @@ list_packages ()
 # order is the same as the input
 which_group ()
 {
-	PACKAGE_GROUPS=`LANG=C $PACMAN_TARGET -Si "$@" | awk '/^Name/{ printf("%s ",$3) } /^Group/{ print $3 }'`
+	PACKAGE_GROUPS=`LANG=en_US.UTF-8 $PACMAN_TARGET -Si "$@" | awk '/^Name/{ printf("%s ",$3) } /^Group/{ print $3 }'`
 }
 
 # get group and packagedesc for packages
@@ -130,7 +130,7 @@ which_group ()
 # note that space is used as separator, but desc is the only thing that will contain spaces.
 pkginfo ()
 {
-	PACKAGE_INFO=`LANG=C $PACMAN_TARGET -Si "$@" | awk '/^Name/{ printf("%s ",$3) } /^Version/{ printf("%s ",$3) } /^Group/{ printf("%s", $3) } /^Description/{ for(i=3;i<=NF;++i) printf(" %s",$i); printf ("\n")}' | awk '!x[$1]++'`
+	PACKAGE_INFO=`LANG=en_US.UTF-8 $PACMAN_TARGET -Si "$@" | awk '/^Name/{ printf("%s ",$3) } /^Version/{ printf("%s ",$3) } /^Group/{ printf("%s", $3) } /^Description/{ for(i=3;i<=NF;++i) printf(" %s",$i); printf ("\n")}' | awk '!x[$1]++'`
 }
 
 # $1 target/runtime
