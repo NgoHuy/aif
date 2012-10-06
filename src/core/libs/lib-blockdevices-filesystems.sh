@@ -29,7 +29,7 @@
 modprobe -q dm-crypt || show_warning modprobe 'Could not modprobe dm-crypt. no support for disk encryption'
 modprobe -q aes-i586 || modprobe -q aes-x86-64 || show_warning modprobe 'Could not modprobe aes-i586 or aes-x86-64. no support for disk encryption'
 
-TMP_DEV_MAP=$RUNTIME_DIR/aif-dev.map
+#TMP_DEV_MAP=$RUNTIME_DIR/aif-dev.map dev.map doesn't exist ?
 TMP_FSTAB=$RUNTIME_DIR/aif-fstab
 TMP_PARTITIONS=$RUNTIME_DIR/aif-partitions
 TMP_FILESYSTEMS=$RUNTIME_DIR/aif-filesystems # Only used internally by this library.  Do not even think about using this as interface to this library.  it won't work
@@ -77,7 +77,7 @@ fs_label_mandatory=('lvm-vg' 'lvm-lv' 'dm_crypt')
 fs_label_optional=('swap' 'ext2' 'ext3' 'ext4' 'reiserfs' 'nilfs2' 'xfs' 'jfs' 'vfat')
 
 # list needed packages per filesystem
-declare -A filesystem_pkg=(["lvm-pv"]="lvm2" ["xfs"]="xfsprogs" ["jfs"]="jfsutils" ["reiserfs"]="reiserfsprogs" ["nilfs2"]="nilfs-utils" ["vfat"]="dosfstools" ["dm_crypt"]="cryptsetup" ["btrfs"]=btrfs-progs-unstable)
+declare -A filesystem_pkg=(["lvm-pv"]="lvm2" ["xfs"]="xfsprogs" ["jfs"]="jfsutils" ["reiserfs"]="reiserfsprogs" ["nilfs2"]="nilfs-utils" ["vfat"]="dosfstools" ["dm_crypt"]="cryptsetup" ["btrfs"]="btrfs-progs") #fix btrfs-progs instead of unstable
 for i in ext2 ext3 ext4
 do
 	filesystem_pkg+=([$i]=e2fsprogs)
@@ -95,7 +95,7 @@ get_possible_fs () {
 }
 
 syslinux_supported_fs=('ext2' 'ext3' 'ext4' 'btrfs' 'vfat')
-supported_bootloaders=('syslinux' 'grub-bios')
+supported_bootloaders=('syslinux' 'grub-bios') # add grub-bios support
 
 # procedural code from quickinst functionized and fixed.
 # there were functions like this in the setup script too, with some subtle differences.  see below
@@ -139,7 +139,7 @@ target_umountall()
 # tells you which blockdevice is configured for the specific mountpoint
 # $1 mountpoint
 get_device_with_mount () {
-	ANSWER_DEVICE=`grep ";$1;" $TMP_BLOCKDEVICES 2>/dev/null | cut -d ' ' -f1`
+	ANSWER_DEVICE=`grep "$1" $TMP_BLOCKDEVICES 2>/dev/null | cut -d ' ' -f1` #remove ;; $1
 	[ -n "$ANSWER_DEVICE" ] # set correct exit code
 }
 
