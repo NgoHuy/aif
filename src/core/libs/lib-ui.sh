@@ -21,10 +21,11 @@ ui_init ()
 	# get keymap/font (maybe configured by aif allready in another process or even in another shell)
 	# otherwise, take default keymap and consolefont as configured in /etc/rc.conf. can be overridden
 	# Note that the vars in /etc/rc.conf can also be empty!
+	#change /etc/rc.conf to /etc/vconsole.conf
 	[ -e $RUNTIME_DIR/aif-keymap      ] && var_KEYMAP=`     cat $RUNTIME_DIR/aif-keymap`
 	[ -e $RUNTIME_DIR/aif-consolefont ] && var_CONSOLEFONT=`cat $RUNTIME_DIR/aif-consolefont`
-	[ -z "$var_KEYMAP"      ] && source /etc/rc.conf && var_KEYMAP=$KEYMAP
-	[ -z "$var_CONSOLEFONT" ] && source /etc/rc.conf && var_CONSOLEFONT=$CONSOLEFONT
+	[ -z "$var_KEYMAP"      ] && source /etc/vconsole.conf && var_KEYMAP=$KEYMAP
+	[ -z "$var_CONSOLEFONT" ] && source /etc/vconsole.conf && var_CONSOLEFONT=$FONT
 }
 
 # taken from setup
