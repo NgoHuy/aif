@@ -928,7 +928,6 @@ interactive_syslinux() {
 	mount -t proc proc $var_TARGET_DIR/proc
 	mount -t sysfs sysfs $var_TARGET_DIR/sys
 	mount --rbind /dev $var_TARGET_DIR/dev
-	mount $bootdev $var_TARGET_DIR/boot
 	chroot $var_TARGET_DIR syslinux-install_update -iam && notify "install successfull on disk" # add -c as chroot	
 	
 	cat >$var_TARGET_DIR/boot/syslinux/syslinux.cfg <<EOF
@@ -1163,12 +1162,15 @@ interactive_grub_install () {
 	mkdir -p $var_TARGET_DIR/boot/grub/locale
 	cp $var_TARGET_DIR/usr/share/locale/en\@quot/LC_MESSAGES/grub.mo $var_TARGET_DIR/boot/grub/locale/en.mo
 	mount --rbind /dev $var_TARGET_DIR/dev
-	mount $bootpart $var_TARGET_DIR/boot
+	mount -t proc proc $var_TARGET_DIR/proc
+	mount -t sysfs sysfs $var_TARGET_DIR/sys
 	chroot $var_TARGET_DIR grub-mkconfig -o /boot/grub/grub.cfg && notify " generate grub.cfg successfully"
 	notify " grub's installed on $bootdev"
 	
 	umount $var_TARGET_DIR/dev
-	umount $var_TARGET_DIR/boot
+	umount $var_TARGET_DIR/proc
+	umount $var_TARGET_DIR/sys
+	
 	cat /tmp/grub.log >$LOG
 	if grep -q "Error [0-9]*: " /tmp/grub.log; then
 		notify "Error installing GRUB. (see $LOG for output)"
