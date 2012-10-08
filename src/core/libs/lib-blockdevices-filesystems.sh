@@ -139,7 +139,7 @@ target_umountall()
 # tells you which blockdevice is configured for the specific mountpoint
 # $1 mountpoint
 get_device_with_mount () {
-	ANSWER_DEVICE=`grep "$1" $TMP_BLOCKDEVICES 2>/dev/null | cut -d ' ' -f1` #remove ;; $1
+	ANSWER_DEVICE=`grep ";$1;" $TMP_BLOCKDEVICES 2>/dev/null | cut -d ' ' -f1` #remove ;; $1
 	[ -n "$ANSWER_DEVICE" ] # set correct exit code
 }
 
@@ -579,6 +579,7 @@ process_filesystems ()
 	do
 		if [[ $fs_mountpoint != no_mountpoint || $fs_type = swap ]]; then
 			debug 'FS' "phase 2: swapon/mounting $part - $fs_type"
+			
 			[[ $fs_mountpoint != no_mountpoint ]] && inform "Mounting $part ($fs_type) on $fs_mountpoint" disks
 			[[ $fs_type = swap ]] &&  inform "Swaponning $part" disks
 			BLOCK_ROLLBACK_USELESS=0
@@ -590,7 +591,7 @@ process_filesystems ()
 		else
 			debug 'FS' "phase 2: no need to mount: $part - $fs_type"
 		fi
-	done < <(sort -t \  -k 6 $TMP_FILESYSTEMS)
+	done < <(sort -t \t  -k 6 $TMP_FILESYSTEMS)
 
 	[ $ret -eq 0 ] && inform "Done processing filesystems/blockdevices" disks 1 && return 0
 	return $ret
@@ -634,7 +635,7 @@ rollback_filesystems ()
 				fi
 			fi
 		fi
-	done < <(sort -t \  -k 6 -r $TMP_FILESYSTEMS)
+	done < <(sort -t \t  -k 6 -r $TMP_FILESYSTEMS)
 
 
 	# phase 2: destruct blockdevices listed in $BLOCK_DATA if they would exist already, in the correct order (first lvm LV, then VG, then PV etc)
@@ -856,8 +857,8 @@ process_filesystem ()
 			[ "$fs_mount" = runtime ] && dst=$fs_mountpoint
 			[ "$fs_mount" = target  ] && dst=$var_TARGET_DIR$fs_mountpoint
 			debug 'FS' "mounting $part on $dst"
-			mkdir -p $dst &>/dev/null # directories may or may not already exist
-			mount -t $fs_type $part $dst >$LOG 2>&1 || ( show_warning 'Mount' "Error mounting $part on $dst" ; ret=1 )
+			mkdir -p $dst && notify "mkdir $dst" # directories may or may not already exist
+			mount -t $fs_type $part $dst && notify "mount $part on $dst" || ( show_warning 'Mount' "Error mounting $part on $dst" ; ret=1 )
 		fi
 	fi
 
