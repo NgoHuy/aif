@@ -284,10 +284,7 @@ find_usable_blockdevices() {
 				echo -ne "$dev $1"
 			fi
 
-			if ((include_dm)) || ! dev_is_in_softraid_or_lvmpv $dev; then
-				dev_used_by_environment $dev && continue
-				echo -ne "$dev $1"
-			fi
+		
 		done
 
 		# Then deal with the "parent" device
