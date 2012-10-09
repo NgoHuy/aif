@@ -90,13 +90,6 @@ interactive_configure_system()
 			while true; do
 				chroot ${var_TARGET_DIR} passwd root && break
 			done
-		elif [ "$FILE" = "/etc/hostname" ]; then # change rc.conf to hostname
-			
-			$EDITOR ${var_TARGET_DIR}${FILE}
-			HOSTNAME=`cat ${var_TARGET_DIR}${FILE}`				
-				# add new hostname to /etc/hosts except in the - admittedly unlikely, but anyway - event the user already added it himself
-				sed -i "6,7 s/$/ $HOSTNAME/" /etc/hosts
-				
 			
 		else
 			$EDITOR ${var_TARGET_DIR}${FILE}
@@ -966,10 +959,7 @@ LABEL off
     MENU LABEL Power Off
     COMBOOT poweroff.com
 EOF
-
-umount  $var_TARGET_DIR/proc
-umount  $var_TARGET_DIR/sys
-umount  $var_TARGET_DIR/dev
+notify "Generate syslinux.cfg successfull"
 } 
 
 
@@ -1167,9 +1157,6 @@ interactive_grub_install () {
 	chroot $var_TARGET_DIR grub-mkconfig -o /boot/grub/grub.cfg && notify " generate grub.cfg successfully"
 	notify " grub's installed on $bootdev"
 	
-	umount $var_TARGET_DIR/dev
-	umount $var_TARGET_DIR/proc
-	umount $var_TARGET_DIR/sys
 	
 	cat /tmp/grub.log >$LOG
 	if grep -q "Error [0-9]*: " /tmp/grub.log; then
