@@ -1093,7 +1093,7 @@ interactive_grub() {
 			ask_option no "Boot device selection" "Select the boot device where the GRUB bootloader will be installed (usually the MBR and not a partition)." required $DEVS || return 1
 			bootdev=$ANSWER_OPTION
 			boothd=$(echo $bootdev | cut -c -8)
-			interactive_grub_install 
+			interactive_grub_install $bootdev
 			if [ $? -eq 0 ]; then
 				GRUB_OK=1
 			fi
@@ -1106,7 +1106,7 @@ interactive_grub() {
 					bootpart=$PART_ROOT
 				fi
 				boothd=$(echo $bootpart | cut -c -8)
-				interactive_grub_install 
+				interactive_grub_install $bootdev
 				if [ $? -eq 0 ]; then
 					GRUB_OK=1
 				fi
@@ -1137,7 +1137,7 @@ interactive_grub_install () {
 		notify "Error: Missing/Invalid boot partition"
 		return 1
 	fi
-	local bootdev=$( ls /dev/ | grep -m 1 sd)
+	local bootdev=$1
 	if [ -z "$bootdev" ]; then
 		notify "GRUB root and setup devices could not be auto-located.  You will need to manually run the GRUB shell to install a bootloader."
 		return 1
@@ -1148,7 +1148,7 @@ interactive_grub_install () {
 	#install grub-bios
 	notify " grub's installing on $bootdev"
 	modprobe dm-mod
-	$var_TARGET_DIR/usr/sbin/grub-install --target=i386-pc --boot-directory=$var_TARGET_DIR/boot/ --recheck /dev/$bootdev
+	$var_TARGET_DIR/usr/sbin/grub-install --target=i386-pc --boot-directory=$var_TARGET_DIR/boot/ --recheck $bootdev
 	mkdir -p $var_TARGET_DIR/boot/grub/locale
 	cp $var_TARGET_DIR/usr/share/locale/en\@quot/LC_MESSAGES/grub.mo $var_TARGET_DIR/boot/grub/locale/en.mo
 	mount --rbind /dev $var_TARGET_DIR/dev
