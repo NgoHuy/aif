@@ -1154,7 +1154,8 @@ interactive_grub_install () {
 	mount --rbind /dev $var_TARGET_DIR/dev
 	mount -t proc proc $var_TARGET_DIR/proc
 	mount -t sysfs sysfs $var_TARGET_DIR/sys
-	sed -i '5 s/""/"init=\/bin\/systemd"/ ' $var_TARGET_DIR/etc/default/grub
+	sed -i '4 s/"quiet"/""/' $var_TARGET_DIR/etc/default/grub
+	sed -i '5 s/""/"init=\/bin\/systemd"/' $var_TARGET_DIR/etc/default/grub
 	chroot $var_TARGET_DIR grub-mkconfig -o /boot/grub/grub.cfg && notify " generate grub.cfg successfully"
 	notify " grub's installed on $bootdev"
 	
