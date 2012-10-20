@@ -19,13 +19,14 @@ target_configure_network()
 		if [[ -f "${var_TARGET_DIR}/etc/profile.d/proxy.sh" ]]; then
 			sed -i "s/^export/#export/" "${var_TARGET_DIR}/etc/profile.d/proxy.sh" || return 1
 		fi
-
-		sed -i "s/^\(interface\)=.*/\1=$IFN/" "${var_TARGET_DIR}/etc/rc.conf" || return 1
+		
+		cp ${var_TARGET_DIR}/etc/network.d/examples/ethernet-dhcp ${var_TARGET_DIR}/etc/network.d/interfaces/ethernet0-dhcp
+		
 		if (( ! DHCP )); then
-			sed -i -e "s/^\(address\)=.*/\1=$IPADDR/" \
-			       -e "s/^\(netmask\)=.*/\1=$SUBNET/" \
-			       -e "s/^\(broadcast\)=.*/\1=$BROADCAST/" \
-			       -e "s/^\(gateway\)=.*/\1=$GW/" "${var_TARGET_DIR}/etc/rc.conf" || return 1
+			cp ${var_TARGET_DIR}/etc/network.d/examples/ethernet-static ${var_TARGET_DIR}/etc/network.d/interfaces/ethernet0-static
+			sed -i -e "s/ADDR.*/ADDR=$IPADDR/" \
+			       -e "s/DNS.*/DNS=$DNS/" \
+			       -e "s/GATEWAY.*/GATEWAY=$GW/" "${var_TARGET_DIR}/etc/network.d/interfaces/ethernet0-static" || return 1
 
 			if [[ $DNS ]]; then
 				for prev_dns in "${auto_added_dns[@]}"; do
