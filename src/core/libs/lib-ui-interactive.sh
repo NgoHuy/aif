@@ -62,7 +62,7 @@ interactive_configure_system()
 		helptext="\nNote that if you want to change any file not listed here (unlikely) you can go to another tty and update ${var_TARGET_DIR}/etc/<filename> yourself"
 		ls -1 /sys/block | grep -q ^dm- && helptext="$helptext\n/dev/mapper/ users: Pay attention to HOOKS in mkinitcpio.conf"
 		list=(
-			"/etc/rc.conf"                  "System Config"
+			
 			"/etc/fstab"                    "Filesystem Mountpoints"
 			"/etc/mkinitcpio.conf"          "Initramfs Config"
 		)
