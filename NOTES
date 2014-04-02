@@ -1,6 +1,7 @@
 This's test
 
 * umounting/destructing blockdevice/filesystem stuff in the blockdevice library.
+
 ** Goals
 not break while trying to build the setup like the user requested (breakage could happen if a device mapper volume is still active or a filesystem is still mounted)
 still allow user to mount stuff himself behind the installers back. he is smarter then us.  just do what we're told.
